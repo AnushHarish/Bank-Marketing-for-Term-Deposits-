@@ -1,0 +1,658 @@
+---
+title: "Bank Marketing for Term Deposits"
+author: "Anush Harish - 21250164"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Packages
+library(tidyverse)
+library(gmodels)
+library(ggmosaic)
+library(gridExtra)
+library(cowplot)
+library(ggplot2)
+library(dplyr)
+library(caret)
+library(ROCR)
+library(pROC)
+library(naivebayes)
+library(randomForest)
+```
+
+```{r}
+#Reading data
+bank_data <- read.table("/Users/anush/Desktop/MSc DSA /SEM SUM/MSC IN DATA SCIENCE AND ANALYTICS-PROJECT & DISSERTATION/Data/bank-additional/bank-additional-full.csv",sep = ";",header = TRUE)
+dim(bank_data)
+Bank_Data<-bank_data
+head(Bank_Data)
+dim(Bank_Data)
+names(Bank_Data)
+```
+
+```{r}
+str(Bank_Data)
+# table(Bank_Data$age)
+# table(Bank_Data$job)
+# table(Bank_Data$marital)
+# table(Bank_Data$education)
+# table(Bank_Data$default)
+# table(Bank_Data$housing)
+# table(Bank_Data$loan)
+# table(Bank_Data$contact)
+# table(Bank_Data$month)
+# table(Bank_Data$day_of_week)
+# table(Bank_Data$duration)
+# table(Bank_Data$campaign)
+# table(Bank_Data$pdays)
+# table(Bank_Data$previous)
+# table(Bank_Data$poutcome)
+# table(Bank_Data$emp.var.rate)
+# table(Bank_Data$cons.price.idx)
+# table(Bank_Data$cons.conf.idx)
+# table(Bank_Data$euribor3m)
+# table(Bank_Data$nr.employed)
+# table(bank_data$y)
+```
+
+# Exploratory Analysis and Feature Engineering
+
+```{r}
+#Unknowns
+colSums(Bank_Data == "unknown")
+sum(Bank_Data == "unknown")
+unknowns<-Bank_Data %>% 
+  summarise_all(list(~sum(. == "unknown"))) %>% 
+  gather(key = "Variables", value = "Number_of_Unknowns") %>% 
+  arrange(-Number_of_Unknowns)
+unknowns
+```
+
+```{r}
+ggplot(data=unknowns, aes(x=reorder(Variables,-Number_of_Unknowns), y=Number_of_Unknowns)) +
+  geom_bar(width=0.5, stat="identity", fill="darkgreen") + 
+  labs(title="Missing values",x="Variables", y="Number of Missing values" )+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text( hjust = 1))+coord_flip()
+```
+
+## Bank Client Data
+
+#### 1. AGE
+
+```{r}
+table(bank_data$age)
+Age_plot <- ggplot(bank_data, aes(x = age, fill = age)) +
+                     geom_histogram(binwidth = 1,color="white") +
+                     labs(x = "Age",y = 'Number of Customers', 
+                          title = 'Distribution of Ages')
+
+Age_plot
+summary(bank_data$age)
+```
+
+The distribution of age is from 17 to 98. 50% of customers are between the ages of 32 and 47. With an average of 40 and median of 38. Customers aged below 30 are categorized as Young_aged, ages from 30 to 60 are categorized as Middle aged, and customers aged above 60 are categorized as Old_age. So, variable age is converted from numerical to categorical.
+
+```{r}
+#Converting age from continuous to categorical
+Bank_Data<-bank_data %>% 
+  mutate(age = if_else(age < 30, "Young_aged", if_else(age > 60, "Old_aged", "Middle_aged")))
+CrossTable(Bank_Data$age,Bank_Data$y)
+#Chi-sq test for age vs y
+chisq.test(Bank_Data$age,Bank_Data$y)
+```
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, age), fill = y)) +labs(title="Age",x="Age")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Since p-value is less than 0.05. It can be concluded that variable age is significant with the response variable i.e., y.The percentage of people over 60 who subscribe to a term deposit is nearly 45.5%, which is higher than the percentage of younger individuals is 16.3% and the percentage of people aged 30 to 60 is 9.5%. 
+
+#### 2. JOB
+
+```{r}
+table(Bank_Data$job)
+CrossTable(Bank_Data$job,Bank_Data$y)
+chisq.test(Bank_Data$job,Bank_Data$y)
+```
+
+The "unknown" level in the data with a proportion of 0.008 so it should be removed because it doesn't provide any significant information. Rows with this value in the "job" column will be eliminated. Job variable is significant with the response variable because its p-value is less than 0.05.
+ 
+```{r}
+#Remove Unknowns
+Bank_Data<-Bank_Data %>% filter(job != "unknown")
+```
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, job), fill = y)) +labs(title="Job",x="Jobs")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+With 31.4%, students show the best relative frequency of term deposit subscription. Term deposit subscriptions are highest among retired people with 25.2% and unemployed with 14.2%. 
+
+#### 3. Marital
+```{r}
+table(Bank_Data$marital)
+CrossTable(Bank_Data$marital,Bank_Data$y)
+chisq.test(Bank_Data$marital,Bank_Data$y)
+```
+
+The "unknown" level in the data with a proportion of 0.002. So,  it should be removed because it doesn't provide any significant information. Rows with this value in the "marital" column will be eliminated. Marital variable is significant with the response variable because its p-value is less than 0.05.
+
+```{r}
+#Remove Unknowns
+Bank_Data<-Bank_Data %>% filter(marital != "unknown")
+```
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, marital), fill = y))  +labs(title="Marital",x="Marital Status", y=" " )+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Single’s show a high subscription rate of 14%. Both married and divorced have almost the same subscription rate of 10%
+
+#### 4. Education
+
+```{r}
+table(Bank_Data$education)
+CrossTable(Bank_Data$education,Bank_Data$y)
+chisq.test(Bank_Data$education,Bank_Data$y)
+```
+
+The “unknown” level contribution for subscription is high. So, the unknown level was changed to university.degree because it was the highest contribution of 29.7%. And illiterate level in the data with a proportion of 0.000. So,  it should be removed because it doesn't provide any significant information. Rows with illiterate value in the "education" column will be eliminated. An education variable is significant with the response variable because its p-value is less than 0.05.
+
+```{r}
+Bank_Data<-Bank_Data %>% filter(education != "illiterate")
+Bank_Data<-Bank_Data %>% mutate(education = recode(education, "unknown" = "university.degree"))
+```
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, education), fill = y)) +labs(title="Education",x="Education")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+```
+It is observed that as the number of years in education increases the term deposit subscription also increases.
+
+#### 5. Defalut
+
+```{r}
+table(Bank_Data$default)
+CrossTable(Bank_Data$default,Bank_Data$y)
+chisq.test(Bank_Data$default,Bank_Data$y)
+```
+
+```{r}
+Bank_Data<-Bank_Data %>% select(-default)
+```
+
+Even though the default variable is significant to the response variable it is removed from the dataset because it has only 3 observations for yes and no as 79.1%, unknowns as 20.9%.
+
+#### 6. Housing
+
+```{r}
+table(Bank_Data$housing)
+CrossTable(Bank_Data$housing,Bank_Data$y)
+chisq.test(Bank_Data$housing,Bank_Data$y)
+```
+
+```{r}
+Bank_Data<-Bank_Data %>% select(-housing)
+```
+
+Since p-value is greater than 0.05, the housing variable is not significant for the response variable y. So, housing is removed from the dataset. 
+
+#### 7. Loan
+
+```{r}
+table(Bank_Data$loan)
+CrossTable(Bank_Data$loan,Bank_Data$y)
+chisq.test(Bank_Data$loan,Bank_Data$y)
+```
+
+
+```{r}
+Bank_Data<-Bank_Data %>% select(-loan)
+```
+
+Since p-value is greater than 0.05, the loan variable is not significant for the response variable y. So, the loan variable is removed from the dataset. 
+
+## Last contact of the current campaign
+
+#### 1. Contact
+
+```{r}
+table(Bank_Data$contact)
+CrossTable(Bank_Data$contact,Bank_Data$y)
+chisq.test(Bank_Data$contact,Bank_Data$y)
+```
+
+Since p-value is less than 0.05. It can be concluded that variable contact is significant with the response variable i.e., y. 
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, contact), fill = y)) +labs(title="Contact",x="Contact")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The percentage of cellular responders who subscribed to term deposits was nearly 14.7%, and the percentage of telephone responders was 5.2%
+
+#### 2. Month
+
+```{r}
+table(Bank_Data$month)
+Bank_Data$month <- factor(Bank_Data$month,levels=c("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"))
+CrossTable(Bank_Data$month,Bank_Data$y)
+chisq.test(Bank_Data$month,Bank_Data$y)
+```
+
+Since p-value is less than 0.05, it can be concluded that variable month is significant with the response variable i.e., y.
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, month), fill = y)) +labs(title="Month",x="Month")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+It can be observed that there was no communication during January and February. The results are very strong for months with very low contact frequency, such as March, September, October, and December, with 44% to 51% of subscribers.
+
+#### 3. Day of the week
+
+```{r}
+table(Bank_Data$day_of_week)
+Bank_Data$day_of_week <- factor(Bank_Data$day_of_week,levels=c("mon","tue","wed","thu","fri","sat","sun"))
+CrossTable(Bank_Data$day_of_week,Bank_Data$y)
+chisq.test(Bank_Data$day_of_week,Bank_Data$y)
+```
+
+Since p-value is less than 0.05. It can be concluded that variable day of the week is significant with the response variable i.e., y.
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, day_of_week), fill = y)) +labs(title="Day of the week",x="Day of the week")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+It is observed that weekend days are not used for making calls. Results tend to be better on Thursdays.
+
+#### 4. Duration
+
+```{r}
+Bank_Data<-Bank_Data %>% select(-duration)
+```
+Before a call is made, the duration is not known. Y is also known after the call ends. As a result, it is discarded. 
+
+## Other Attributes
+
+#### 1. Campaign
+
+```{r}
+table(bank_data$campaign)
+```
+
+```{r}
+ggplot(bank_data) + aes(x = campaign) +geom_bar() 
+```
+
+A numerical campaign was converted to a categorical campaign. During a single marketing campaign, calling the same person more than 6-7 times seems excessive
+
+```{r}
+ggplot(Bank_Data) + aes(x = campaign) +geom_bar() 
+```
+
+```{r}
+#Converting campaign from continuous to categorical
+Bank_Data<-Bank_Data %>% filter(campaign<=7)
+table(Bank_Data$campaign)
+CrossTable(Bank_Data$campaign,Bank_Data$y)
+chisq.test(Bank_Data$campaign,Bank_Data$y)
+```
+
+
+Since p-value is less than 0.05. It can be concluded that variable campaign is significant with the response variable i.e.,y.
+
+#### 2. Pdays
+
+```{r}
+table(bank_data$pdays)
+```
+
+Most of the values have 999. So, pdays are converted from numerical to categorical. If not contacted in pdays then 0(NO) else 1(YES). New column is added called cat_pdays with 0’s and 1’s and the existing column i.e., pdays is discarded.
+
+```{r}
+#New variable
+Bank_Data<-Bank_Data %>% mutate(cat_pdays = if_else(pdays == 999, "No", "Yes"))
+#Deleting old variable
+Bank_Data<-Bank_Data %>% select(-pdays)
+table(Bank_Data$cat_pdays)
+CrossTable(Bank_Data$cat_pdays,Bank_Data$y)
+chisq.test(Bank_Data$cat_pdays,Bank_Data$y)
+```
+
+Since p-value is less than 0.05. It can be concluded that variable cat_pdays is significant with the response variable i.e., y. 
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, cat_pdays), fill = y)) +labs(title="Contacted in a previous campaign in the pdays",x="Cat_pdays")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(hjust = 1))
+```
+
+Recontacting a customer after a prior campaign appears to significantly boost the likelihood of subscribing
+
+#### 3. Previous
+
+```{r}
+table(bank_data$previous)
+ggplot(bank_data) + aes(x = previous) +geom_bar() 
+Bank_Data<-Bank_Data %>% filter(previous<=2)
+table(Bank_Data$previous)
+ggplot(Bank_Data) + aes(x = previous) +geom_bar() 
+```
+
+Converted from numerical to categorical with 3 levels. Because in this attribute some levels show way not enough observations 
+
+```{r}
+CrossTable(Bank_Data$previous,Bank_Data$y)
+chisq.test(Bank_Data$previous,Bank_Data$y)
+```
+
+Since p-value is less than 0.05. It can be concluded that variable previous is significant with the response variable i.e., y.
+
+#### 4. Poutcome 
+
+```{r}
+table(Bank_Data$poutcome)
+CrossTable(Bank_Data$poutcome,Bank_Data$y)
+chisq.test(Bank_Data$poutcome,Bank_Data$y)
+```
+
+Since p-value is less than 0.05. It can be concluded that variable Poutcome is significant with the response variable i.e., y.
+
+```{r}
+ggplot(Bank_Data) + 
+  geom_mosaic(aes(x = product(y, poutcome), fill = y)) +labs(title="Previous contact outcome",x="outcome")+theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text( hjust = 1))
+
+```
+
+Almost 64.4% of people who previously subscribed to a term deposit have agreed to do so again. Therefore, it is important to recontact people.
+
+## Social - Economical context attributes
+
+The five continuous variables are indicators of social and economic conditions. They are Variation in employment rate, Consumer price index, Consumer confidence index, Euribor 3 months rate, Number of employees. The correlation between these variables is calculated and plotted. 
+
+```{r}
+# Function to add correlation coefficients
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...) {
+    usr <- par("usr")
+    on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    Cor <- abs(cor(x, y))
+    txt <- paste0(prefix, format(c(Cor, 0.123456789), digits = digits)[1])
+    if(missing(cex.cor)) {
+        cex.cor <- 0.4 / strwidth(txt)
+    }
+    text(0.5, 0.5, txt,
+         cex = 1 + cex.cor * Cor) 
+}
+
+# Plotting the correlation matrix
+plot(Bank_Data[,11:15],
+      upper.panel = panel.cor,  
+      lower.panel = panel.smooth) 
+```
+
+More than 0.90 correlation coefficients were found in three pairs, which is far too high. Emp.var.rate is not significant. In order to soften the correlations between those five variables (see Fig 3.15), this variable is discarded. While two variables, euribor 3m and nr.employed, still show a strong correlation of 95%, these variables are retained. Due to the fact that the number of employees is not related to the euribor 3 months rate, this is most likely a misleading association.
+
+```{r}
+Bank_Data<-Bank_Data %>% select(-emp.var.rate)
+```
+
+```{r}
+#t.test(Bank_Data$emp.var.rate~Bank_Data$y)
+t.test(Bank_Data$cons.price.idx~Bank_Data$y)
+t.test(Bank_Data$cons.conf.idx~Bank_Data$y)
+t.test(Bank_Data$euribor3m~Bank_Data$y)
+t.test(Bank_Data$nr.employed~Bank_Data$y)
+```
+
+From the Welch two sample t-test it can be seen that all other variables in social-economical context are significant with the response variable.
+
+```{r}
+#np1<-ggplot(Bank_Data, aes(x=y, y=emp.var.rate, fill=y)) +
+ # geom_boxplot()
+np2<-ggplot(Bank_Data, aes(x=y, y=cons.price.idx, fill=y)) +
+  geom_boxplot()
+np3<-ggplot(Bank_Data, aes(x=y, y=cons.conf.idx, fill=y)) +
+  geom_boxplot()
+np4<-ggplot(Bank_Data, aes(x=y, y=euribor3m, fill=y)) +
+  geom_boxplot()
+np5<-ggplot(Bank_Data, aes(x=y, y=nr.employed, fill=y)) +
+  geom_boxplot()
+ggplot_build(np2)$data
+ggplot_build(np3)$data
+ggplot_build(np4)$data
+ggplot_build(np5)$data
+plot_grid(np2,np3,np4,np5,ncol=2)
+```
+
+There is a similar difference in the average consumer price index between subscribers and non-subscribers: 93.4055 for subscribers and 93.5345 for non-subscribers. It is not apparent that the consumer confidence index differs significantly between subscribers and non-subscribers: -39.55 for non-subscribers and -41.15 for subscribers. Euribor 3 month subscribers have a lower median and are more variable than non-subscribers. There is a significant difference between the number of bank employees by customer group. Among non-subscribed customers, the median number of employees 5196 is higher than the median number of subscribers 5099.
+
+#### Reordering Dataset
+```{r}
+Bank_Data <- Bank_Data[, c(1,2,3,4,5,6,7,8,16,9,10,11,12,13,14,15)]
+```
+
+#### Cleaned dataset
+```{r}
+dim(Bank_Data)
+str(Bank_Data)
+#Unknowns
+colSums(Bank_Data == "unknown")
+sum(Bank_Data == "unknown")
+unknowns<-Bank_Data %>% 
+  summarise_all(list(~sum(. == "unknown"))) %>% 
+  gather(key = "Variables", value = "Number_of_Unknowns") %>% 
+  arrange(-Number_of_Unknowns)
+unknowns
+```
+
+```{r}
+#Changing response no to 0 and yes to 1
+Bank_Data<-Bank_Data %>% mutate(y = factor(if_else(y == "no", 0, 1),levels = c(0, 1)))
+```
+
+```{r}
+ # Convert all char columns to factor
+Bank_Data_1 <- as.data.frame(unclass(Bank_Data),stringsAsFactors = TRUE)
+str(Bank_Data_1)
+```
+
+Rejected variables : Five variables are rejected. A lack of variability in default, a lack of significance in housing, a lack of significance in loans, a meaninglessness in duration, and a lack of significance in variation in employment rate.
+
+Accepted variables : It is necessary to transform every character variable into a factor variable in order to interpret it. Finally, there are 15 predictors and 1 response variable without missing values.
+
+## Model Implementation
+
+Splitting a data set into training and testing sets is known as data splicing. The data is split 80:20, so that 80% of the data is used for training and 20% for testing the model; this was done using the random samples and permutation function sample() in R. 
+
+```{r}
+set.seed(123)
+s <- sample(nrow(Bank_Data_1),nrow(Bank_Data_1)*.8)
+Bank_Data_Train <- Bank_Data_1[s,]
+Bank_Data_Test <- Bank_Data_1[-s,]
+```
+
+->Linear algorithms: Logistic Regression. 
+->Nonlinear algorithms: Naïve Bayes.
+->Bagging algorithms: Random Forest.
+
+##### Linear algorithms: Logistic Regression.
+
+Logistic Regression Model 1 : Fitted for the entire cleaned dataset.
+
+```{r}
+LogR1 <- glm(y ~., family=binomial(link='logit'), data=Bank_Data_Train)
+
+summary(LogR1)
+```
+
+Regression models can be simplified by eliminating insignificant terms. It is easier to work with a model if the number of terms is reduced. A model with insignificant terms can reduce the precision of the predictors if they are left in the model. So, model 2 is developed where the model 1 is reduced to significant predictors.
+
+Logistic Regression Model 2 : Reduced model.
+
+```{r}
+LogR2 <- glm(y ~ age + contact + month +day_of_week+cat_pdays + poutcome+ nr.employed, family=binomial(link='logit'), data=Bank_Data_Train)
+
+summary(LogR2)
+```
+
+For comparing two models Model 1 and Model 2 ANOVA test is performed. In R ANOVA test is performed using anova(model 1, model 2) function.
+
+```{r}
+anova(LogR1,LogR2,test = "Chisq")
+```
+
+AIC is less for model 1. And also in anova test we reject the null hypo and conclude Model 1 is better.
+
+```{r}
+logistic_train_score = predict(LogR1,Bank_Data_Train,type = "response")
+logistic_train_score_pred <- factor(ifelse(logistic_train_score < .5, 0,1))
+ltrptr<-confusionMatrix(logistic_train_score_pred,Bank_Data_Train$y,positive="1", mode = "everything")
+
+
+logistic_test_score = predict(LogR1,newdata = Bank_Data_Test,type = "response")
+logistic_test_score_pred <- factor(ifelse(logistic_test_score < .5,0,1))
+ltrpte<-confusionMatrix(logistic_test_score_pred,Bank_Data_Test$y,positive="1", mode = "everything")
+ltrpte
+```
+
+```{r}
+par(pty="s")
+roc(Bank_Data_Test$y,logistic_test_score,plot=TRUE,legacy.axes=TRUE)
+par(pty="m")
+```
+Here, the predicted accuracy of the logistic regression model is 90.2% and the misclassification rate is 0.09737828. The area under the curve is 0.7787.
+
+```{r}
+# rocplot <- function(pred, truth, ...) {
+#   predob = prediction(pred, truth)
+#   perf = performance(predob, "tpr", "fpr")
+#   plot(perf, ...)
+#   area <- auc(truth, pred)
+#   area <- format(round(area, 4), nsmall = 4)
+#   text(x=0.8, y=0.1, labels = paste("AUC =", area))
+# 
+#   # the reference x=y line
+#   segments(x0=0, y0=0, x1=1, y1=1, col="gray", lty=2)
+# }
+# 
+# rocplot(logistic_test_score, Bank_Data_Test$y, col="blue")
+```
+
+#### Nonlinear algorithms: Naïve Bayes.
+
+```{r}
+x<-Bank_Data_Train[,-16]
+y<-Bank_Data_Train$y
+Nb<-naive_bayes(y~.,data=Bank_Data_Train,usekernel = T)
+Nb
+```
+
+
+```{r}
+#predict-train
+Nb_pred_train<-predict(Nb,Bank_Data_Train)
+Nb_ptrain_cm<-confusionMatrix(Nb_pred_train,Bank_Data_Train$y,positive="1", mode = "everything")
+```
+
+```{r}
+#predict-test
+Nb_pred_test<-predict(Nb,Bank_Data_Test)
+Nb_ptest_cm<-confusionMatrix(Nb_pred_test,Bank_Data_Test$y,positive="1", mode = "everything")
+Nb_ptest_cm
+```
+
+```{r}
+# rocplot <- function(pred, truth, ...) {
+#   predob = prediction(pred, truth)
+#   perf = performance(predob, "tpr", "fpr")
+#   plot(perf, ...)
+#   area <- auc(truth, pred)
+#   area <- format(round(area, 4), nsmall = 4)
+#   text(x=0.8, y=0.1, labels = paste("AUC =", area))
+# 
+#   # the reference x=y line
+#   segments(x0=0, y0=0, x1=1, y1=1, col="gray", lty=2)
+# }
+
+#rocplot(Nb_pred_test, Bank_Data_Test$y, col="blue")
+
+
+```
+
+```{r}
+#Plotting AUC
+nb_prob <- predict(Nb, type ='prob', Bank_Data_Test) 
+
+nb_probs <- prediction(nb_prob[,2], Bank_Data_Test$y)
+plot(performance(nb_probs, "tpr", "fpr"), col = "red", main = "Area Under the Curve - AUC")
+abline(0,1, lty = 8, col = "black")
+
+auc <- performance(nb_probs, "auc")
+v_auc <- slot(auc, "y.values")[[1]]
+v_auc
+```
+
+Here, the predicted accuracy of the naive bayes model is 87.6% and the misclassification rate is 0.123983. The area under the curve is 0.7781189 
+
+#### Bagging algorithms: Random Forest.
+
+```{r}
+rfbank <- randomForest(y ~ ., data=Bank_Data_Train)
+rfbank
+```
+
+```{r}
+pred_train <- predict(rfbank, Bank_Data_Train)
+mean(pred_train != Bank_Data_Train$y) # training error
+
+pred_test <- predict(rfbank, Bank_Data_Test)
+mean(pred_test != Bank_Data_Test$y) # test error
+```
+
+```{r}
+rf_ptrain_cm<-confusionMatrix(pred_train,Bank_Data_Train$y,positive="1", mode = "everything")
+#rf_ptrain_cm
+
+rf_ptest_cm<-confusionMatrix(pred_test,Bank_Data_Test$y,positive="1", mode = "everything")
+rf_ptest_cm
+```
+
+
+```{r}
+#Plotting ROC curve for decision tree model
+rf_prob <- predict(rfbank, type ='prob', Bank_Data_Test)
+
+rf_probs <- prediction(rf_prob[,2], Bank_Data_Test$y)
+plot(performance(rf_probs, "tpr", "fpr"), col = "blue", main = "AUC - Random Forest")
+abline(0,1, lty = 8, col = "grey")
+
+auc <- performance(rf_probs, "auc")
+v_auc <- slot(auc, "y.values")[[1]]
+v_auc
+```
+
+Here, the predicted accuracy of the random forest model is 90.24% and the misclassification rate is 0.09763657. 
+
+```{r}
+plot(rfbank,main='Random Forest Error Decreasing') 
+```
+
+```{r}
+varImpPlot(rfbank)
+```
+
+It has been determined that the Euribor 3m rate contributed the highest percentage to the bank dataset, followed by the number of employees and jobs.
+
+# Conclusion
+
+The main study goal was to examine customer behavior when initiating a term deposit in a bank using certain basic criteria. Three distinct machine learning approaches were used to evaluate the study (Logistic Regression, Naive Bayes, Random Forest). Random Forest had the highest performance, with the maximum predicted accuracy of 90.24 percent. Also, euribor 3m rate, nr.employed, and job are the three most important variables in the forecast. This algorithm will route phone calls to customers who are more likely to sign up for a term deposit, allowing banking institutions to save expenses while increasing earnings. In the future, the model may be enhanced by comparing it to a larger dataset. Also, different models like boosting algorithms and ensemble model must be used to get more accuracy.
